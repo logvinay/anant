@@ -1,0 +1,10 @@
+@MyApp.Server_HostAddress = http://localhost:5001
+
+GET {{MyApp.Server_HostAddress}}/api/weatherforecast
+Accept: application/json
+
+###
+
+GET {{MyApp.Server_HostAddress}}/healthz
+
+###

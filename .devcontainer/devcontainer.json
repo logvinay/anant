@@ -1,0 +1,26 @@
+{
+  "name": "dev-vm",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "none",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/dotnet:2": { "version": "lts" },
+    "ghcr.io/devcontainers/features/azure-cli:1": {},
+    "ghcr.io/devcontainers/features/terraform:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+  },
+
+  "portsAttributes": {
+    "5001": { "onAutoForward": "ignore" },
+    "5173": { "onAutoForward": "ignore" }
+  },
+
+  "postCreateCommand": "sudo chown vscode:vscode /home/vscode/.claude",
+
+  "customizations": {
+    "vscode": { "extensions": ["anthropic.claude-code", "ms-dotnettools.csdevkit", "hashicorp.terraform", "ms-azuretools.vscode-azurecontainerapps"] }
+  }
+}

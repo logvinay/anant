@@ -1,0 +1,81 @@
+name: myapp
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - src/myapp/**
+      - .github/workflows/myapp.yml
+  workflow_dispatch:
+
+concurrency:
+  group: myapp-deploy-dev
+  cancel-in-progress: false
+
+env:
+  APP_DIR: src/myapp
+  IMAGE_NAME: myapp
+  TF_ENVIRONMENT: dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "image=ghcr.io/${owner}/${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.APP_DIR }}
+          push: true
+          tags: ${{ steps.meta.outputs.image }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=myapp
+          cache-to: type=gha,mode=max,scope=myapp
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_container_image: ${{ needs.build.outputs.image }}
+      TF_VAR_ghcr_username: ${{ github.repository_owner }}
+      TF_VAR_ghcr_pull_token: ${{ secrets.GHCR_PULL_TOKEN }}
+    defaults:
+      run:
+        working-directory: src/myapp/infra/main
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - run: terraform init -input=false -backend-config=envs/${TF_ENVIRONMENT}.backend.hcl
+
+      - run: terraform apply -input=false -auto-approve -var-file=envs/${TF_ENVIRONMENT}.tfvars
+
+      - run: echo "Deployed to $(terraform output -raw app_url)" >> "$GITHUB_STEP_SUMMARY"
